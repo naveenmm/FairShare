@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models.dart';
+import '../services/ocr_service.dart';
 
 class BillSetupScreen extends StatelessWidget {
   const BillSetupScreen({super.key});
@@ -72,21 +74,147 @@ class BillSetupScreen extends StatelessWidget {
                   onChanged: (val) => provider.updateDiscount(val),
                   theme: theme,
                 ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.add_circle_outline),
-                  label: const Text('Add New Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(56),
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () => _showAddItemDialog(context, provider),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.document_scanner_outlined),
+                        label: const Text('Scan Bill', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                        ),
+                        onPressed: () => _handleScan(context, provider),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 1,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('New Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => _showAddItemDialog(context, provider),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _handleScan(BuildContext context, BillProvider provider) async {
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source != null) {
+      final image = await picker.pickImage(source: source);
+      if (image != null) {
+        if (!context.mounted) return;
+        _showScanReviewDialog(context, provider, image.path);
+      }
+    }
+  }
+
+  void _showScanReviewDialog(BuildContext context, BillProvider provider, String imagePath) {
+    final ocrService = OCRService();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => FutureBuilder<List<ScannedItem>>(
+        future: ocrService.scanBill(imagePath),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Processing bill...'),
+                ],
+              ),
+            );
+          }
+          
+          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+            return AlertDialog(
+              title: const Text('No Items Found'),
+              content: const Text('We couldn\'t recognize any items. Try a clearer photo or add items manually.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+              ],
+            );
+          }
+
+          final scannedItems = snapshot.data!;
+          final selectedItems = List<bool>.filled(scannedItems.length, true);
+
+          return StatefulBuilder(
+            builder: (context, setModalState) => AlertDialog(
+              title: const Text('Review Scanned Items'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: scannedItems.length,
+                  itemBuilder: (context, index) {
+                    final item = scannedItems[index];
+                    return CheckboxListTile(
+                      title: Text(item.name),
+                      subtitle: Text('₹${item.price.toStringAsFixed(2)}'),
+                      value: selectedItems[index],
+                      onChanged: (val) => setModalState(() => selectedItems[index] = val!),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () {
+                    for (int i = 0; i < scannedItems.length; i++) {
+                      if (selectedItems[i]) {
+                        provider.addItem(scannedItems[i].name, scannedItems[i].price);
+                      }
+                    }
+                    Navigator.pop(context);
+                    ocrService.dispose();
+                  },
+                  child: const Text('Add Selected'),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
