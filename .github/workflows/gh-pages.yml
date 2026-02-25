@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - image_processing
 
 jobs:
   build-and-deploy:
