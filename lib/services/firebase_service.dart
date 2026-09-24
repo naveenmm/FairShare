@@ -7,16 +7,16 @@ import '../models.dart';
 
 class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  late final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb
-        ? '81277127292-kjk08m1h2a7a413tbp6e0akjogv81rji.apps.googleusercontent.com'
-        : null,
-  );
+  late final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   Future<UserCredential> signInWithGoogle() async {
+    if (kIsWeb) {
+      return _auth.signInWithPopup(GoogleAuthProvider());
+    }
+
     final account = await _googleSignIn.signIn();
     if (account == null) {
       throw StateError('Google sign-in was cancelled.');
