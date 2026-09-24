@@ -86,5 +86,31 @@ void main() {
       expect(provider.addPerson('alice'), isFalse);
       expect(provider.people.length, 1);
     });
+
+    test('Percentage and exact split modes calculate correctly', () {
+      final provider = BillProvider();
+
+      provider.addPerson('Alice');
+      provider.addPerson('Bob');
+      final aliceId = provider.people[0].id;
+      final bobId = provider.people[1].id;
+
+      provider.addItem('Dinner', 100.0);
+      final itemId = provider.items[0].id;
+
+      provider.setItemSplitMode(itemId, 'percentage');
+      provider.assignItem(itemId, aliceId, 25.0);
+      provider.assignItem(itemId, bobId, 75.0);
+
+      expect(provider.getPersonSubtotal(aliceId), 25.0);
+      expect(provider.getPersonSubtotal(bobId), 75.0);
+
+      provider.setItemSplitMode(itemId, 'exact');
+      provider.assignItem(itemId, aliceId, 40.0);
+      provider.assignItem(itemId, bobId, 60.0);
+
+      expect(provider.getPersonSubtotal(aliceId), 40.0);
+      expect(provider.getPersonSubtotal(bobId), 60.0);
+    });
   });
 }

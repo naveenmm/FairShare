@@ -21,12 +21,21 @@ class Item {
   String name;
   double price;
   Map<String, double> assignments;
+  String splitMode;
+
+  static const List<String> validSplitModes = [
+    'equal',
+    'percentage',
+    'exact',
+    'quantity',
+  ];
 
   Item({
     String? id,
     required this.name,
     required this.price,
     Map<String, double>? assignments,
+    this.splitMode = 'equal',
   })  : id = id ?? const Uuid().v4(),
         assignments = assignments ?? {};
 
@@ -39,6 +48,7 @@ class Item {
         'name': name,
         'price': price,
         'assignments': assignments,
+        'split_mode': splitMode,
       };
 
   factory Item.fromJson(Map<String, dynamic> json) => Item(
@@ -48,6 +58,8 @@ class Item {
         assignments: (json['assignments'] as Map<String, dynamic>? ?? {}).map(
           (personId, shares) => MapEntry(personId, (shares as num).toDouble()),
         ),
+        splitMode:
+            (json['split_mode'] ?? json['splitMode'] ?? 'equal').toString(),
       );
 }
 
@@ -298,6 +310,21 @@ class BillProvider extends ChangeNotifier {
     return true;
   }
 
+  bool setItemSplitMode(String itemId, String splitMode) {
+    if (!Item.validSplitModes.contains(splitMode)) {
+      return false;
+    }
+
+    final itemIndex = _items.indexWhere((item) => item.id == itemId);
+    if (itemIndex == -1) {
+      return false;
+    }
+
+    _items[itemIndex].splitMode = splitMode;
+    notifyListeners();
+    return true;
+  }
+
   void removeItem(String id) {
     _items.removeWhere((item) => item.id == id);
     notifyListeners();
@@ -338,10 +365,35 @@ class BillProvider extends ChangeNotifier {
   double getPersonSubtotal(String personId) {
     double personSubtotal = 0.0;
     for (var item in _items) {
-      final totalShares = item.totalShares;
-      if (totalShares > 0 && item.assignments.containsKey(personId)) {
-        personSubtotal +=
-            (item.price * item.assignments[personId]! / totalShares);
+      final personShare = item.assignments[personId] ?? 0.0;
+      if (personShare <= 0) {
+        continue;
+      }
+
+      switch (item.splitMode) {
+        case 'percentage':
+          final totalPercent =
+              item.assignments.values.fold(0.0, (sum, value) => sum + value);
+          if (totalPercent > 0) {
+            personSubtotal += item.price * (personShare / totalPercent);
+          }
+          break;
+        case 'exact':
+          personSubtotal += personShare;
+          break;
+        case 'quantity':
+          final totalQuantity = item.totalShares;
+          if (totalQuantity > 0) {
+            personSubtotal += item.price * (personShare / totalQuantity);
+          }
+          break;
+        case 'equal':
+        default:
+          final totalShares = item.totalShares;
+          if (totalShares > 0) {
+            personSubtotal += item.price * (personShare / totalShares);
+          }
+          break;
       }
     }
     return personSubtotal;
