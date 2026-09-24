@@ -47,9 +47,6 @@ dependencies:
   cloud_firestore: ^4.15.0
   google_sign_in: ^6.2.1
 
-dependency_overrides:
-  web: 0.1.4
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
