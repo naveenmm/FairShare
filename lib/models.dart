@@ -44,7 +44,10 @@ class Item {
         id: json['id'],
         name: json['name'],
         price: (json['price'] as num).toDouble(),
-        assignments: Map<String, double>.from(json['assignments'] ?? {}),
+        assignments: (json['assignments'] as Map<String, dynamic>? ?? {}).map(
+          (personId, shares) =>
+              MapEntry(personId, (shares as num).toDouble()),
+        ),
       );
 }
 
