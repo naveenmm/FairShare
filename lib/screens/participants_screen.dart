@@ -30,9 +30,12 @@ class ParticipantsScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.group_add_outlined, size: 64, color: theme.colorScheme.outlineVariant),
+                        Icon(Icons.group_add_outlined,
+                            size: 64, color: theme.colorScheme.outlineVariant),
                         const SizedBox(height: 16),
-                        Text('Who\'s sharing the bill?', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.outline)),
+                        Text('Who\'s sharing the bill?',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(color: theme.colorScheme.outline)),
                       ],
                     ),
                   )
@@ -46,18 +49,25 @@ class ParticipantsScreen extends StatelessWidget {
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+                          side: BorderSide(
+                              color: theme.colorScheme.outlineVariant
+                                  .withOpacity(0.5)),
                         ),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 8),
                           leading: CircleAvatar(
                             backgroundColor: theme.colorScheme.primaryContainer,
-                            foregroundColor: theme.colorScheme.onPrimaryContainer,
+                            foregroundColor:
+                                theme.colorScheme.onPrimaryContainer,
                             child: Text(person.name[0].toUpperCase()),
                           ),
-                          title: Text(person.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          title: Text(person.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
                           trailing: IconButton(
-                            icon: const Icon(Icons.remove_circle_outline, color: Colors.grey),
+                            icon: const Icon(Icons.remove_circle_outline,
+                                color: Colors.grey),
                             onPressed: () => provider.removePerson(person.id),
                           ),
                         ),
@@ -69,7 +79,8 @@ class ParticipantsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24.0),
             child: ElevatedButton.icon(
               icon: const Icon(Icons.person_add_outlined),
-              label: const Text('Add Person', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              label: const Text('Add Person',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
                 backgroundColor: theme.colorScheme.secondaryContainer,
@@ -99,7 +110,9 @@ class ParticipantsScreen extends StatelessWidget {
                   return provider.savedPeople;
                 }
                 return provider.savedPeople.where((String option) {
-                  return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                  return option
+                      .toLowerCase()
+                      .contains(textEditingValue.text.toLowerCase());
                 });
               },
               onSelected: (String selection) {
@@ -112,7 +125,8 @@ class ParticipantsScreen extends StatelessWidget {
                     elevation: 4.0,
                     borderRadius: BorderRadius.circular(12),
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 200, maxWidth: 280),
+                      constraints:
+                          const BoxConstraints(maxHeight: 200, maxWidth: 280),
                       child: ListView.builder(
                         padding: EdgeInsets.zero,
                         shrinkWrap: true,
@@ -132,7 +146,8 @@ class ParticipantsScreen extends StatelessWidget {
                   ),
                 );
               },
-              fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+              fieldViewBuilder: (context, textEditingController, focusNode,
+                  onFieldSubmitted) {
                 return TextField(
                   controller: textEditingController,
                   focusNode: focusNode,
@@ -144,10 +159,22 @@ class ParticipantsScreen extends StatelessWidget {
                   ),
                   onChanged: (val) => selectedName = val,
                   onSubmitted: (val) {
-                    if (val.isNotEmpty) {
-                      provider.addPerson(val);
-                      Navigator.pop(context);
+                    final trimmedName = val.trim();
+                    if (trimmedName.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Please enter a valid name.')),
+                      );
+                      return;
                     }
+                    if (!provider.addPerson(trimmedName)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('This person already exists.')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context);
                   },
                 );
               },
@@ -155,13 +182,25 @@ class ParticipantsScreen extends StatelessWidget {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () {
-              if (selectedName.isNotEmpty) {
-                provider.addPerson(selectedName);
-                Navigator.pop(context);
+              final trimmedName = selectedName.trim();
+              if (trimmedName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid name.')),
+                );
+                return;
               }
+              if (!provider.addPerson(trimmedName)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('This person already exists.')),
+                );
+                return;
+              }
+              Navigator.pop(context);
             },
             child: const Text('Add Person'),
           ),
@@ -176,22 +215,27 @@ class ParticipantsScreen extends StatelessWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Add Multiple People'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('How many people to add?', style: TextStyle(fontSize: 16)),
+              const Text('How many people to add?',
+                  style: TextStyle(fontSize: 16)),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
-                    onPressed: count > 1 ? () => setModalState(() => count--) : null,
+                    onPressed:
+                        count > 1 ? () => setModalState(() => count--) : null,
                     icon: const Icon(Icons.remove_circle_outline, size: 32),
                   ),
                   const SizedBox(width: 20),
-                  Text('$count', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                  Text('$count',
+                      style: const TextStyle(
+                          fontSize: 32, fontWeight: FontWeight.bold)),
                   const SizedBox(width: 20),
                   IconButton(
                     onPressed: () => setModalState(() => count++),
@@ -202,7 +246,9 @@ class ParticipantsScreen extends StatelessWidget {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
             TextButton(
               onPressed: () {
                 provider.addMultiplePeople(count);

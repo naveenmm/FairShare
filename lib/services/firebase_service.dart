@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -37,24 +38,42 @@ class FirebaseAuthService {
 }
 
 class BillCloudRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool get isAvailable => Firebase.apps.isNotEmpty;
 
   CollectionReference<Map<String, dynamic>> _bills(String uid) {
-    return _firestore.collection('users').doc(uid).collection('bills');
+    if (!isAvailable) {
+      throw StateError('Firebase is not initialized.');
+    }
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('bills');
   }
 
   Future<List<SavedBill>> fetchBills(String uid) async {
+    if (!isAvailable) {
+      return const [];
+    }
+
     final snapshot = await _bills(uid).orderBy('date', descending: true).get();
     return snapshot.docs
         .map((document) => SavedBill.fromJson(document.data()))
         .toList();
   }
 
-  Future<void> saveBill(String uid, SavedBill bill) {
-    return _bills(uid).doc(bill.id).set(bill.toJson());
+  Future<void> saveBill(String uid, SavedBill bill) async {
+    if (!isAvailable) {
+      return;
+    }
+
+    await _bills(uid).doc(bill.id).set(bill.toJson());
   }
 
-  Future<void> deleteBill(String uid, String billId) {
-    return _bills(uid).doc(billId).delete();
+  Future<void> deleteBill(String uid, String billId) async {
+    if (!isAvailable) {
+      return;
+    }
+
+    await _bills(uid).doc(billId).delete();
   }
 }

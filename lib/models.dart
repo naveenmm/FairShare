@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'services/firebase_service.dart';
@@ -45,8 +46,7 @@ class Item {
         name: json['name'],
         price: (json['price'] as num).toDouble(),
         assignments: (json['assignments'] as Map<String, dynamic>? ?? {}).map(
-          (personId, shares) =>
-              MapEntry(personId, (shares as num).toDouble()),
+          (personId, shares) => MapEntry(personId, (shares as num).toDouble()),
         ),
       );
 }
@@ -92,6 +92,18 @@ class SavedBill {
       );
 }
 
+class SettlementEntry {
+  final String fromPersonId;
+  final String toPersonId;
+  final double amount;
+
+  const SettlementEntry({
+    required this.fromPersonId,
+    required this.toPersonId,
+    required this.amount,
+  });
+}
+
 class BillProvider extends ChangeNotifier {
   List<Person> _people = [];
   List<Item> _items = [];
@@ -116,34 +128,46 @@ class BillProvider extends ChangeNotifier {
 
   // Persistence
   Future<void> _loadState() async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-    // Load History
-    final historyJson = prefs.getString('bill_history');
-    if (historyJson != null) {
-      final List decoded = jsonDecode(historyJson);
-      _history = decoded.map((j) => SavedBill.fromJson(j)).toList();
-      _history.sort((a, b) => b.date.compareTo(a.date));
-    }
+      // Load History
+      final historyJson = prefs.getString('bill_history');
+      if (historyJson != null) {
+        final List decoded = jsonDecode(historyJson);
+        _history = decoded.map((j) => SavedBill.fromJson(j)).toList();
+        _history.sort((a, b) => b.date.compareTo(a.date));
+      }
 
-    // Load Saved People
-    final peopleNames = prefs.getStringList('saved_people');
-    if (peopleNames != null) {
-      _savedPeople = Set.from(peopleNames);
+      // Load Saved People
+      final peopleNames = prefs.getStringList('saved_people');
+      if (peopleNames != null) {
+        _savedPeople = Set.from(peopleNames);
+      }
+    } on MissingPluginException {
+      // SharedPreferences is unavailable in non-platform test runners.
     }
 
     notifyListeners();
   }
 
   Future<void> _saveHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final historyJson = jsonEncode(_history.map((h) => h.toJson()).toList());
-    await prefs.setString('bill_history', historyJson);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = jsonEncode(_history.map((h) => h.toJson()).toList());
+      await prefs.setString('bill_history', historyJson);
+    } on MissingPluginException {
+      // Ignore local persistence when the platform plugin is unavailable.
+    }
   }
 
   Future<void> _savePeople() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('saved_people', _savedPeople.toList());
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('saved_people', _savedPeople.toList());
+    } on MissingPluginException {
+      // Ignore local persistence when the platform plugin is unavailable.
+    }
   }
 
   Future<void> saveCurrentToHistory() async {
@@ -229,20 +253,38 @@ class BillProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addPerson(String name) {
-    _people.add(Person(name: name));
-    _savedPeople.add(name);
+  bool hasPersonName(String name) {
+    final normalized = name.trim();
+    if (normalized.isEmpty) return true;
+    return _people.any(
+      (person) => person.name.trim().toLowerCase() == normalized.toLowerCase(),
+    );
+  }
+
+  bool addPerson(String name) {
+    final cleanedName = name.trim();
+    if (cleanedName.isEmpty || hasPersonName(cleanedName)) {
+      return false;
+    }
+
+    _people.add(Person(name: cleanedName));
+    _savedPeople.add(cleanedName);
     _savePeople();
     notifyListeners();
+    return true;
   }
 
   void addMultiplePeople(int count) {
+    if (count <= 0) return;
+
     final startId =
         _people.where((p) => p.name.startsWith('Person ')).length + 1;
     for (int i = 0; i < count; i++) {
       final name = 'Person ${startId + i}';
-      _people.add(Person(name: name));
-      _savedPeople.add(name);
+      if (!hasPersonName(name)) {
+        _people.add(Person(name: name));
+        _savedPeople.add(name);
+      }
     }
     _savePeople();
     notifyListeners();
@@ -256,9 +298,16 @@ class BillProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addItem(String name, double price) {
-    _items.add(Item(name: name, price: price));
+  bool addItem(String name, double price) {
+    final cleanedName = name.trim();
+    final validatedPrice = price < 0 ? 0.0 : price;
+    if (cleanedName.isEmpty || validatedPrice <= 0) {
+      return false;
+    }
+
+    _items.add(Item(name: cleanedName, price: validatedPrice));
     notifyListeners();
+    return true;
   }
 
   void removeItem(String id) {
@@ -329,4 +378,73 @@ class BillProvider extends ChangeNotifier {
   }
 
   double get grandTotal => subtotal + _tax - _discount;
+
+  double get averageShare {
+    if (_people.isEmpty) return 0.0;
+    return grandTotal / _people.length;
+  }
+
+  List<SettlementEntry> get settlementBreakdown {
+    if (_people.isEmpty) return const [];
+
+    final balances = <String, double>{
+      for (final person in _people)
+        person.id: getPersonTotal(person.id) - averageShare,
+    };
+
+    final creditors = <MapEntry<String, double>>[];
+    final debtors = <MapEntry<String, double>>[];
+
+    for (final entry in balances.entries) {
+      if (entry.value > 0.0001) {
+        creditors.add(entry);
+      } else if (entry.value < -0.0001) {
+        debtors.add(MapEntry(entry.key, entry.value.abs()));
+      }
+    }
+
+    creditors.sort((a, b) => b.value.compareTo(a.value));
+    debtors.sort((a, b) => b.value.compareTo(a.value));
+
+    final settlements = <SettlementEntry>[];
+    int debtorIndex = 0;
+    int creditorIndex = 0;
+
+    while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
+      final debtor = debtors[debtorIndex];
+      final creditor = creditors[creditorIndex];
+
+      final amount =
+          debtor.value < creditor.value ? debtor.value : creditor.value;
+
+      if (amount > 0.0001) {
+        settlements.add(
+          SettlementEntry(
+            fromPersonId: debtor.key,
+            toPersonId: creditor.key,
+            amount: amount,
+          ),
+        );
+      }
+
+      debtors[debtorIndex] = MapEntry(debtor.key, debtor.value - amount);
+      creditors[creditorIndex] =
+          MapEntry(creditor.key, creditor.value - amount);
+
+      if ((debtors[debtorIndex].value).abs() < 0.0001) {
+        debtorIndex++;
+      }
+      if ((creditors[creditorIndex].value).abs() < 0.0001) {
+        creditorIndex++;
+      }
+    }
+
+    return settlements
+        .map((entry) => SettlementEntry(
+              fromPersonId: entry.fromPersonId,
+              toPersonId: entry.toPersonId,
+              amount: entry.amount,
+            ))
+        .toList();
+  }
 }

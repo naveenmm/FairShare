@@ -20,9 +20,12 @@ class BillSetupScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.restaurant_menu, size: 64, color: theme.colorScheme.outlineVariant),
+                        Icon(Icons.restaurant_menu,
+                            size: 64, color: theme.colorScheme.outlineVariant),
                         const SizedBox(height: 16),
-                        Text('No items added yet', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.outline)),
+                        Text('No items added yet',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(color: theme.colorScheme.outline)),
                       ],
                     ),
                   )
@@ -36,14 +39,23 @@ class BillSetupScreen extends StatelessWidget {
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+                          side: BorderSide(
+                              color: theme.colorScheme.outlineVariant
+                                  .withOpacity(0.5)),
                         ),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text('₹${item.price.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 8),
+                          title: Text(item.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text('₹${item.price.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.bold)),
                           trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.redAccent),
                             onPressed: () => provider.removeItem(item.id),
                           ),
                         ),
@@ -55,7 +67,12 @@ class BillSetupScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4))],
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4))
+              ],
             ),
             child: Column(
               children: [
@@ -78,7 +95,8 @@ class BillSetupScreen extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.document_scanner_outlined),
-                        label: const Text('Scan Bill', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: const Text('Scan Bill',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(56),
                         ),
@@ -90,7 +108,8 @@ class BillSetupScreen extends StatelessWidget {
                       flex: 1,
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.add_circle_outline),
-                        label: const Text('New Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: const Text('New Item',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size.fromHeight(56),
                           backgroundColor: theme.colorScheme.primary,
@@ -127,24 +146,49 @@ class BillSetupScreen extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameController, autofocus: true, decoration: const InputDecoration(labelText: 'Item Name', hintText: 'e.g., Pizza')),
+            TextField(
+                controller: nameController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                    labelText: 'Item Name', hintText: 'e.g., Pizza')),
             const SizedBox(height: 16),
             TextField(
               controller: priceController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Price', prefixText: '₹ '),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration:
+                  const InputDecoration(labelText: 'Price', prefixText: '₹ '),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               final price = double.tryParse(priceController.text) ?? 0;
-              if (nameController.text.isNotEmpty && price > 0) {
-                provider.addItem(nameController.text, price);
-                Navigator.pop(context);
+              final itemName = nameController.text.trim();
+              if (itemName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter an item name.')),
+                );
+                return;
               }
+              if (price <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Price must be greater than zero.')),
+                );
+                return;
+              }
+              if (!provider.addItem(itemName, price)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Item could not be added.')),
+                );
+                return;
+              }
+              Navigator.pop(context);
             },
             child: const Text('Add'),
           ),
@@ -177,7 +221,10 @@ class _InlineModifierRowState extends State<_InlineModifierRow> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialValue == 0 ? '' : widget.initialValue.toStringAsFixed(2));
+    _controller = TextEditingController(
+        text: widget.initialValue == 0
+            ? ''
+            : widget.initialValue.toStringAsFixed(2));
   }
 
   @override
@@ -187,7 +234,9 @@ class _InlineModifierRowState extends State<_InlineModifierRow> {
     if (widget.initialValue != oldWidget.initialValue) {
       final currentLocalVal = double.tryParse(_controller.text) ?? 0;
       if (currentLocalVal != widget.initialValue) {
-        final text = widget.initialValue == 0 ? '' : widget.initialValue.toStringAsFixed(2);
+        final text = widget.initialValue == 0
+            ? ''
+            : widget.initialValue.toStringAsFixed(2);
         _controller.text = text;
       }
     }
@@ -211,7 +260,8 @@ class _InlineModifierRowState extends State<_InlineModifierRow> {
           children: [
             const Padding(
               padding: EdgeInsets.only(top: 2),
-              child: Text('₹', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              child: Text('₹',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             ),
             const SizedBox(width: 8),
             SizedBox(
@@ -220,12 +270,15 @@ class _InlineModifierRowState extends State<_InlineModifierRow> {
               child: TextField(
                 controller: _controller,
                 textAlign: TextAlign.end,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   isDense: true,
                   hintText: '0.00',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
                 onChanged: (val) => widget.onChanged(double.tryParse(val) ?? 0),
               ),
