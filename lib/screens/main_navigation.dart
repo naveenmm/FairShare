@@ -49,7 +49,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         title: const Text('Welcome!'),
         content: const Text('Would you like to start a new bill?'),
         actions: [
-          if (Provider.of<BillProvider>(context, listen: false).history.isNotEmpty)
+          if (Provider.of<BillProvider>(context, listen: false)
+              .history
+              .isNotEmpty)
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Later'),
@@ -83,13 +85,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
         child: NavigationBar(
           selectedIndex: _selectedIndex,
-          onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+          onDestinationSelected: (index) =>
+              setState(() => _selectedIndex = index),
           destinations: const [
-            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Items'),
-            NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'People'),
-            NavigationDestination(icon: Icon(Icons.assignment_outlined), selectedIcon: Icon(Icons.assignment), label: 'Assign'),
-            NavigationDestination(icon: Icon(Icons.summarize_outlined), selectedIcon: Icon(Icons.summarize), label: 'Summary'),
-            NavigationDestination(icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'History'),
+            NavigationDestination(
+                icon: Icon(Icons.receipt_long_outlined),
+                selectedIcon: Icon(Icons.receipt_long),
+                label: 'Items'),
+            NavigationDestination(
+                icon: Icon(Icons.people_outline),
+                selectedIcon: Icon(Icons.people),
+                label: 'People'),
+            NavigationDestination(
+                icon: Icon(Icons.assignment_outlined),
+                selectedIcon: Icon(Icons.assignment),
+                label: 'Assign'),
+            NavigationDestination(
+                icon: Icon(Icons.summarize_outlined),
+                selectedIcon: Icon(Icons.summarize),
+                label: 'Summary'),
+            NavigationDestination(
+                icon: Icon(Icons.history_outlined),
+                selectedIcon: Icon(Icons.history),
+                label: 'History'),
           ],
         ),
       ),

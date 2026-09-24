@@ -1,15 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'models.dart';
-import 'screens/splash_screen.dart';
+import 'firebase_options.dart';
+import 'screens/auth_gate.dart';
 
-void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (context) => BillProvider(),
-      child: const SplitBillsApp(),
-    ),
-  );
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const FirebaseBootstrap());
+}
+
+class FirebaseBootstrap extends StatefulWidget {
+  const FirebaseBootstrap({super.key});
+
+  @override
+  State<FirebaseBootstrap> createState() => _FirebaseBootstrapState();
+}
+
+class _FirebaseBootstrapState extends State<FirebaseBootstrap> {
+  late final Future<void> _initialization;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialization = _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initialization,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Firebase initialization failed:\n${snapshot.error}',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return ChangeNotifierProvider(
+          create: (context) => BillProvider(),
+          child: const SplitBillsApp(),
+        );
+      },
+    );
+  }
 }
 
 class SplitBillsApp extends StatelessWidget {
@@ -51,11 +109,12 @@ class SplitBillsApp extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             elevation: 0,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
       ),
-      home: const SplashScreen(),
+      home: const AuthGate(),
     );
   }
 }

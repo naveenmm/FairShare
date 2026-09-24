@@ -1,0 +1,26 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "buildConfigurations": {
+          ".": {
+            "projectId": "fairshare-d53b3",
+            "appId": "1:81277127292:android:f660f3c030e5ed4ee2d7f9",
+            "fileOutput": "android/app/google-services.json"
+          }
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "fairshare-d53b3",
+          "configurations": {
+            "android": "1:81277127292:android:f660f3c030e5ed4ee2d7f9"
+          }
+        }
+      }
+    }
+  }
+}

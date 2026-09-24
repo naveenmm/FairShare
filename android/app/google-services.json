@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "81277127292",
+    "project_id": "fairshare-d53b3",
+    "storage_bucket": "fairshare-d53b3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:81277127292:android:f660f3c030e5ed4ee2d7f9",
+        "android_client_info": {
+          "package_name": "com.naveen.split_bills"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "81277127292-l9e3ihrrjbap50ni36n5vtnp9asajmuq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.naveen.split_bills",
+            "certificate_hash": "482b82bc61b512ad21af1d78ee43fb692bb48224"
+          }
+        },
+        {
+          "client_id": "81277127292-kjk08m1h2a7a413tbp6e0akjogv81rji.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkuRJY1o8TR2Zs2tOORMLyxSViRW9WBJU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "81277127292-kjk08m1h2a7a413tbp6e0akjogv81rji.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -21,7 +21,7 @@ class _SummaryScreenState extends State<SummaryScreen> {
   Future<void> _handleAutoSave() async {
     final provider = Provider.of<BillProvider>(context, listen: false);
     await Future.delayed(const Duration(milliseconds: 1500));
-    provider.saveCurrentToHistory();
+    await provider.saveCurrentToHistory();
     if (mounted) {
       setState(() => _isLoading = false);
     }
@@ -68,7 +68,11 @@ class _SummaryScreenState extends State<SummaryScreen> {
               children: [
                 const Icon(Icons.people_alt_outlined, size: 20),
                 const SizedBox(width: 8),
-                Text('INDIVIDUAL SPLITS', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 1.2, color: theme.colorScheme.outline)),
+                Text('INDIVIDUAL SPLITS',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: theme.colorScheme.outline)),
               ],
             ),
             const SizedBox(height: 16),
@@ -81,13 +85,17 @@ class _SummaryScreenState extends State<SummaryScreen> {
                 final person = provider.people[index];
                 final subtotal = provider.getPersonSubtotal(person.id);
                 final total = provider.getPersonTotal(person.id);
-                final percentage = provider.grandTotal == 0 ? 0.0 : (total / provider.grandTotal) * 100;
+                final percentage = provider.grandTotal == 0
+                    ? 0.0
+                    : (total / provider.grandTotal) * 100;
 
                 return Card(
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+                    side: BorderSide(
+                        color:
+                            theme.colorScheme.outlineVariant.withOpacity(0.5)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -96,26 +104,47 @@ class _SummaryScreenState extends State<SummaryScreen> {
                         Row(
                           children: [
                             CircleAvatar(
-                              backgroundColor: theme.colorScheme.primaryContainer,
-                              child: Text(person.name[0].toUpperCase(), style: TextStyle(color: theme.colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold)),
+                              backgroundColor:
+                                  theme.colorScheme.primaryContainer,
+                              child: Text(person.name[0].toUpperCase(),
+                                  style: TextStyle(
+                                      color:
+                                          theme.colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold)),
                             ),
                             const SizedBox(width: 16),
-                            Expanded(child: Text(person.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+                            Expanded(
+                                child: Text(person.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18))),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text('₹${total.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 20)),
-                                Text('${percentage.toStringAsFixed(1)}% of bill', style: theme.textTheme.bodySmall),
+                                Text('₹${total.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 20)),
+                                Text(
+                                    '${percentage.toStringAsFixed(1)}% of bill',
+                                    style: theme.textTheme.bodySmall),
                               ],
                             ),
                           ],
                         ),
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
+                        const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Divider()),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Items base cost', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline)),
-                            Text('₹${subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w500)),
+                            Text('Items base cost',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.outline)),
+                            Text('₹${subtotal.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ],
@@ -139,18 +168,31 @@ class _SummaryScreenState extends State<SummaryScreen> {
         color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
-          BoxShadow(color: theme.colorScheme.primary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
+          BoxShadow(
+              color: theme.colorScheme.primary.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10)),
         ],
       ),
       child: Column(
         children: [
-          Text('Grand Total', style: TextStyle(color: theme.colorScheme.onPrimary.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.w500)),
+          Text('Grand Total',
+              style: TextStyle(
+                  color: theme.colorScheme.onPrimary.withOpacity(0.8),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500)),
           const SizedBox(height: 4),
-          Text('₹${provider.grandTotal.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onPrimary, fontSize: 48, fontWeight: FontWeight.w800)),
+          Text('₹${provider.grandTotal.toStringAsFixed(2)}',
+              style: TextStyle(
+                  color: theme.colorScheme.onPrimary,
+                  fontSize: 48,
+                  fontWeight: FontWeight.w800)),
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
+            decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20)),
             child: Column(
               children: [
                 _summaryRow('Subtotal', provider.subtotal, theme),
@@ -170,8 +212,15 @@ class _SummaryScreenState extends State<SummaryScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: theme.colorScheme.onPrimary.withOpacity(0.9), fontSize: 15)),
-        Text('₹${value.toStringAsFixed(2)}', style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.bold, fontSize: 15)),
+        Text(label,
+            style: TextStyle(
+                color: theme.colorScheme.onPrimary.withOpacity(0.9),
+                fontSize: 15)),
+        Text('₹${value.toStringAsFixed(2)}',
+            style: TextStyle(
+                color: theme.colorScheme.onPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 15)),
       ],
     );
   }
@@ -181,9 +230,12 @@ class _SummaryScreenState extends State<SummaryScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear All?'),
-        content: const Text('This will reset the current bill. You can still find it in History later.'),
+        content: const Text(
+            'This will reset the current bill. You can still find it in History later.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () {
               provider.reset();

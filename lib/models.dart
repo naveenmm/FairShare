@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'services/firebase_service.dart';
 
 class Person {
   final String id;
@@ -10,7 +11,8 @@ class Person {
   Person({String? id, required this.name}) : id = id ?? const Uuid().v4();
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name};
-  factory Person.fromJson(Map<String, dynamic> json) => Person(id: json['id'], name: json['name']);
+  factory Person.fromJson(Map<String, dynamic> json) =>
+      Person(id: json['id'], name: json['name']);
 }
 
 class Item {
@@ -27,7 +29,8 @@ class Item {
   })  : id = id ?? const Uuid().v4(),
         assignments = assignments ?? {};
 
-  double get totalShares => assignments.values.fold(0.0, (sum, share) => sum + share);
+  double get totalShares =>
+      assignments.values.fold(0.0, (sum, share) => sum + share);
   double getShareFor(String personId) => assignments[personId] ?? 0.0;
 
   Map<String, dynamic> toJson() => {
@@ -77,7 +80,8 @@ class SavedBill {
   factory SavedBill.fromJson(Map<String, dynamic> json) => SavedBill(
         id: json['id'],
         date: DateTime.parse(json['date']),
-        people: (json['people'] as List).map((p) => Person.fromJson(p)).toList(),
+        people:
+            (json['people'] as List).map((p) => Person.fromJson(p)).toList(),
         items: (json['items'] as List).map((i) => Item.fromJson(i)).toList(),
         tax: (json['tax'] as num).toDouble(),
         discount: (json['discount'] as num).toDouble(),
@@ -93,6 +97,7 @@ class BillProvider extends ChangeNotifier {
   List<SavedBill> _history = [];
   String? _currentBillId;
   Set<String> _savedPeople = {};
+  final BillCloudRepository _cloudRepository = BillCloudRepository();
 
   BillProvider() {
     _loadState();
@@ -109,7 +114,7 @@ class BillProvider extends ChangeNotifier {
   // Persistence
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     // Load History
     final historyJson = prefs.getString('bill_history');
     if (historyJson != null) {
@@ -123,7 +128,7 @@ class BillProvider extends ChangeNotifier {
     if (peopleNames != null) {
       _savedPeople = Set.from(peopleNames);
     }
-    
+
     notifyListeners();
   }
 
@@ -138,9 +143,9 @@ class BillProvider extends ChangeNotifier {
     await prefs.setStringList('saved_people', _savedPeople.toList());
   }
 
-  void saveCurrentToHistory() {
+  Future<void> saveCurrentToHistory() async {
     if (grandTotal <= 0 && _items.isEmpty && _people.isEmpty) return;
-    
+
     final bill = SavedBill(
       id: _currentBillId, // Use existing ID if editing
       date: DateTime.now(),
@@ -164,8 +169,29 @@ class BillProvider extends ChangeNotifier {
       _history.insert(0, bill);
       _currentBillId = bill.id; // Now we are editing this bill
     }
-    
-    _saveHistory();
+
+    await _saveHistory();
+    final user = FirebaseAuthService().currentUser;
+    if (user != null) {
+      await _cloudRepository.saveBill(user.uid, bill);
+    }
+    notifyListeners();
+  }
+
+  Future<void> syncWithCloud(String uid) async {
+    final cloudBills = await _cloudRepository.fetchBills(uid);
+    final localById = {for (final bill in _history) bill.id: bill};
+    final cloudById = {for (final bill in cloudBills) bill.id: bill};
+
+    for (final localBill in _history) {
+      if (!cloudById.containsKey(localBill.id)) {
+        await _cloudRepository.saveBill(uid, localBill);
+      }
+    }
+
+    _history = {...cloudById, ...localById}.values.toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    await _saveHistory();
     notifyListeners();
   }
 
@@ -187,12 +213,16 @@ class BillProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void deleteHistoryItem(String id) {
+  Future<void> deleteHistoryItem(String id) async {
     if (_currentBillId == id) {
       _currentBillId = null;
     }
     _history.removeWhere((h) => h.id == id);
-    _saveHistory();
+    await _saveHistory();
+    final user = FirebaseAuthService().currentUser;
+    if (user != null) {
+      await _cloudRepository.deleteBill(user.uid, id);
+    }
     notifyListeners();
   }
 
@@ -204,11 +234,12 @@ class BillProvider extends ChangeNotifier {
   }
 
   void addMultiplePeople(int count) {
-    final startId = _people.where((p) => p.name.startsWith('Person ')).length + 1;
+    final startId =
+        _people.where((p) => p.name.startsWith('Person ')).length + 1;
     for (int i = 0; i < count; i++) {
-        final name = 'Person ${startId + i}';
-        _people.add(Person(name: name));
-        _savedPeople.add(name);
+      final name = 'Person ${startId + i}';
+      _people.add(Person(name: name));
+      _savedPeople.add(name);
     }
     _savePeople();
     notifyListeners();
@@ -269,7 +300,8 @@ class BillProvider extends ChangeNotifier {
     for (var item in _items) {
       final totalShares = item.totalShares;
       if (totalShares > 0 && item.assignments.containsKey(personId)) {
-        personSubtotal += (item.price * item.assignments[personId]! / totalShares);
+        personSubtotal +=
+            (item.price * item.assignments[personId]! / totalShares);
       }
     }
     return personSubtotal;
@@ -288,7 +320,9 @@ class BillProvider extends ChangeNotifier {
   }
 
   double getPersonTotal(String personId) {
-    return getPersonSubtotal(personId) + getPersonTax(personId) - getPersonDiscount(personId);
+    return getPersonSubtotal(personId) +
+        getPersonTax(personId) -
+        getPersonDiscount(personId);
   }
 
   double get grandTotal => subtotal + _tax - _discount;
