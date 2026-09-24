@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models.dart';
 import '../services/firebase_service.dart';
 
@@ -11,70 +12,89 @@ class HistoryScreen extends StatelessWidget {
     final provider = Provider.of<BillProvider>(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bill History'),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            onPressed: () => FirebaseAuthService().signOut(),
-          ),
-        ],
-      ),
-      body: provider.history.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history,
-                      size: 64, color: theme.colorScheme.outlineVariant),
-                  const SizedBox(height: 16),
-                  const Text('No saved bills yet'),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: provider.history.length,
-              itemBuilder: (context, index) {
-                final bill = provider.history[index];
-                final isCurrent = provider.currentBillId == bill.id;
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: isCurrent
-                        ? BorderSide(color: theme.colorScheme.primary, width: 2)
-                        : BorderSide.none,
-                  ),
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    onTap: () => _showBillDetail(context, bill, provider),
-                    title: Text(
-                        '${bill.date.day}/${bill.date.month}/${bill.date.year} Bill',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(
-                        '${bill.items.length} items • ${bill.people.length} people'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('₹${bill.total.toStringAsFixed(2)}',
-                            style: TextStyle(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.chevron_right, color: Colors.grey),
-                      ],
-                    ),
-                  ),
-                );
-              },
+    return StreamBuilder<User?>(
+      stream: FirebaseAuthService().authStateChanges,
+      builder: (context, authSnapshot) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Bill History'),
+          actions: [
+            IconButton(
+              tooltip: authSnapshot.data == null ? 'Sign in' : 'Sign out',
+              icon:
+                  Icon(authSnapshot.data == null ? Icons.login : Icons.logout),
+              onPressed: authSnapshot.data == null
+                  ? () => _signIn(context)
+                  : () => FirebaseAuthService().signOut(),
             ),
+          ],
+        ),
+        body: provider.history.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.history,
+                        size: 64, color: theme.colorScheme.outlineVariant),
+                    const SizedBox(height: 16),
+                    const Text('No saved bills yet'),
+                  ],
+                ),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: provider.history.length,
+                itemBuilder: (context, index) {
+                  final bill = provider.history[index];
+                  final isCurrent = provider.currentBillId == bill.id;
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: isCurrent
+                          ? BorderSide(
+                              color: theme.colorScheme.primary, width: 2)
+                          : BorderSide.none,
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
+                      onTap: () => _showBillDetail(context, bill, provider),
+                      title: Text(
+                          '${bill.date.day}/${bill.date.month}/${bill.date.year} Bill',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                          '${bill.items.length} items • ${bill.people.length} people'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('₹${bill.total.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16)),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.chevron_right, color: Colors.grey),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
     );
+  }
+
+  Future<void> _signIn(BuildContext context) async {
+    try {
+      await FirebaseAuthService().signInWithGoogle();
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign-in failed: $error')),
+        );
+      }
+    }
   }
 
   void _showBillDetail(
