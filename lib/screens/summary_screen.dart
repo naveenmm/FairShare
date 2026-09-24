@@ -20,7 +20,6 @@ class _SummaryScreenState extends State<SummaryScreen> {
 
   Future<void> _handleAutoSave() async {
     final provider = Provider.of<BillProvider>(context, listen: false);
-    await Future.delayed(const Duration(milliseconds: 1500));
     await provider.saveCurrentToHistory();
     if (mounted) {
       setState(() => _isLoading = false);
