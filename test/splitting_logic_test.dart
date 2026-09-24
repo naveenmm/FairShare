@@ -79,42 +79,12 @@ void main() {
       expect(provider.grandTotal, 27.0);
     });
 
-    test(
-        'Duplicate people are rejected and settlement breakdown resolves balances',
-        () {
+    test('Duplicate people are rejected', () {
       final provider = BillProvider();
 
       expect(provider.addPerson('Alice'), isTrue);
       expect(provider.addPerson('alice'), isFalse);
       expect(provider.people.length, 1);
-
-      provider.addPerson('Bob');
-      provider.addPerson('Charlie');
-
-      final aliceId = provider.people[0].id;
-      final bobId = provider.people[1].id;
-      final charlieId = provider.people[2].id;
-
-      provider.addItem('Dinner', 60.0);
-      provider.addItem('Dessert', 30.0);
-
-      final dinnerId = provider.items[0].id;
-      final dessertId = provider.items[1].id;
-
-      provider.assignItem(dinnerId, aliceId, 2.0);
-      provider.assignItem(dinnerId, bobId, 1.0);
-      provider.assignItem(dessertId, charlieId, 1.0);
-
-      expect(provider.getPersonTotal(aliceId), 40.0);
-      expect(provider.getPersonTotal(bobId), 20.0);
-      expect(provider.getPersonTotal(charlieId), 30.0);
-      expect(provider.averageShare, 30.0);
-
-      final settlements = provider.settlementBreakdown;
-      expect(settlements.length, 1);
-      expect(settlements[0].fromPersonId, bobId);
-      expect(settlements[0].toPersonId, aliceId);
-      expect(settlements[0].amount, 10.0);
     });
   });
 }

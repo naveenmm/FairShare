@@ -92,18 +92,6 @@ class SavedBill {
       );
 }
 
-class SettlementEntry {
-  final String fromPersonId;
-  final String toPersonId;
-  final double amount;
-
-  const SettlementEntry({
-    required this.fromPersonId,
-    required this.toPersonId,
-    required this.amount,
-  });
-}
-
 class BillProvider extends ChangeNotifier {
   List<Person> _people = [];
   List<Item> _items = [];
@@ -378,73 +366,4 @@ class BillProvider extends ChangeNotifier {
   }
 
   double get grandTotal => subtotal + _tax - _discount;
-
-  double get averageShare {
-    if (_people.isEmpty) return 0.0;
-    return grandTotal / _people.length;
-  }
-
-  List<SettlementEntry> get settlementBreakdown {
-    if (_people.isEmpty) return const [];
-
-    final balances = <String, double>{
-      for (final person in _people)
-        person.id: getPersonTotal(person.id) - averageShare,
-    };
-
-    final creditors = <MapEntry<String, double>>[];
-    final debtors = <MapEntry<String, double>>[];
-
-    for (final entry in balances.entries) {
-      if (entry.value > 0.0001) {
-        creditors.add(entry);
-      } else if (entry.value < -0.0001) {
-        debtors.add(MapEntry(entry.key, entry.value.abs()));
-      }
-    }
-
-    creditors.sort((a, b) => b.value.compareTo(a.value));
-    debtors.sort((a, b) => b.value.compareTo(a.value));
-
-    final settlements = <SettlementEntry>[];
-    int debtorIndex = 0;
-    int creditorIndex = 0;
-
-    while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
-      final debtor = debtors[debtorIndex];
-      final creditor = creditors[creditorIndex];
-
-      final amount =
-          debtor.value < creditor.value ? debtor.value : creditor.value;
-
-      if (amount > 0.0001) {
-        settlements.add(
-          SettlementEntry(
-            fromPersonId: debtor.key,
-            toPersonId: creditor.key,
-            amount: amount,
-          ),
-        );
-      }
-
-      debtors[debtorIndex] = MapEntry(debtor.key, debtor.value - amount);
-      creditors[creditorIndex] =
-          MapEntry(creditor.key, creditor.value - amount);
-
-      if ((debtors[debtorIndex].value).abs() < 0.0001) {
-        debtorIndex++;
-      }
-      if ((creditors[creditorIndex].value).abs() < 0.0001) {
-        creditorIndex++;
-      }
-    }
-
-    return settlements
-        .map((entry) => SettlementEntry(
-              fromPersonId: entry.fromPersonId,
-              toPersonId: entry.toPersonId,
-              amount: entry.amount,
-            ))
-        .toList();
-  }
 }
