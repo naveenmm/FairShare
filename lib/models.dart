@@ -66,6 +66,7 @@ class Item {
 class SavedBill {
   final String id;
   final DateTime date;
+  final DateTime updatedAt;
   final List<Person> people;
   final List<Item> items;
   final double tax;
@@ -75,16 +76,19 @@ class SavedBill {
   SavedBill({
     String? id,
     required this.date,
+    DateTime? updatedAt,
     required this.people,
     required this.items,
     required this.tax,
     required this.discount,
     required this.total,
-  }) : id = id ?? const Uuid().v4();
+  })  : id = id ?? const Uuid().v4(),
+        updatedAt = updatedAt ?? date;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'date': date.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
         'people': people.map((p) => p.toJson()).toList(),
         'items': items.map((i) => i.toJson()).toList(),
         'tax': tax,
@@ -95,6 +99,10 @@ class SavedBill {
   factory SavedBill.fromJson(Map<String, dynamic> json) => SavedBill(
         id: json['id'],
         date: DateTime.parse(json['date']),
+        updatedAt: DateTime.tryParse(
+              json['updatedAt']?.toString() ?? '',
+            ) ??
+            DateTime.parse(json['date']),
         people:
             (json['people'] as List).map((p) => Person.fromJson(p)).toList(),
         items: (json['items'] as List).map((i) => Item.fromJson(i)).toList(),
@@ -112,6 +120,7 @@ class BillProvider extends ChangeNotifier {
   List<SavedBill> _history = [];
   String? _currentBillId;
   Set<String> _savedPeople = {};
+  Map<String, DateTime> _acknowledgedVersions = {};
   final BillCloudRepository _cloudRepository = BillCloudRepository();
 
   BillProvider() {
@@ -144,6 +153,14 @@ class BillProvider extends ChangeNotifier {
       if (peopleNames != null) {
         _savedPeople = Set.from(peopleNames);
       }
+
+      final acknowledgedJson = prefs.getString('bill_sync_acknowledged');
+      if (acknowledgedJson != null) {
+        final decoded = jsonDecode(acknowledgedJson) as Map<String, dynamic>;
+        _acknowledgedVersions = decoded.map(
+          (id, value) => MapEntry(id, DateTime.parse(value.toString())),
+        );
+      }
     } on MissingPluginException {
       // SharedPreferences is unavailable in non-platform test runners.
     }
@@ -170,12 +187,35 @@ class BillProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _saveAcknowledgedVersions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'bill_sync_acknowledged',
+        jsonEncode(
+          _acknowledgedVersions.map(
+            (id, timestamp) => MapEntry(id, timestamp.toIso8601String()),
+          ),
+        ),
+      );
+    } on MissingPluginException {
+      // Ignore local persistence when the platform plugin is unavailable.
+    }
+  }
+
+  bool _isLocallyDirty(SavedBill bill) {
+    final acknowledged = _acknowledgedVersions[bill.id];
+    return acknowledged == null || bill.updatedAt.isAfter(acknowledged);
+  }
+
   Future<void> saveCurrentToHistory() async {
     if (grandTotal <= 0 && _items.isEmpty && _people.isEmpty) return;
 
+    final updatedAt = DateTime.now();
     final bill = SavedBill(
       id: _currentBillId, // Use existing ID if editing
-      date: DateTime.now(),
+      date: updatedAt,
+      updatedAt: updatedAt,
       people: List.from(_people),
       items: List.from(_items),
       tax: _tax,
@@ -200,25 +240,65 @@ class BillProvider extends ChangeNotifier {
     await _saveHistory();
     final user = FirebaseAuthService().currentUser;
     if (user != null) {
-      await _cloudRepository.saveBill(user.uid, bill);
+      final resolvedBill = await _cloudRepository.saveBill(user.uid, bill);
+      _acknowledgedVersions[resolvedBill.id] = resolvedBill.updatedAt;
+      if (resolvedBill.updatedAt != bill.updatedAt) {
+        final index = _history.indexWhere((h) => h.id == resolvedBill.id);
+        if (index != -1) {
+          _history[index] = resolvedBill;
+        }
+        if (_currentBillId == resolvedBill.id) {
+          _people = List.from(resolvedBill.people);
+          _items = List.from(resolvedBill.items);
+          _tax = resolvedBill.tax;
+          _discount = resolvedBill.discount;
+        }
+      }
+      await _saveAcknowledgedVersions();
     }
     notifyListeners();
   }
 
   Future<void> syncWithCloud(String uid) async {
-    final cloudBills = await _cloudRepository.fetchBills(uid);
+    final cloudRecords = await _cloudRepository.fetchBills(uid);
     final localById = {for (final bill in _history) bill.id: bill};
-    final cloudById = {for (final bill in cloudBills) bill.id: bill};
+    final cloudById = {
+      for (final record in cloudRecords) record.id: record,
+    };
+    final resolvedBills = <String, SavedBill>{};
 
     for (final localBill in _history) {
-      if (!cloudById.containsKey(localBill.id)) {
-        await _cloudRepository.saveBill(uid, localBill);
+      final cloudRecord = cloudById[localBill.id];
+      if (cloudRecord?.isDeleted == true) {
+        if (_isLocallyDirty(localBill) &&
+            localBill.updatedAt.isAfter(cloudRecord!.updatedAt)) {
+          final resolved = await _cloudRepository.saveBill(uid, localBill);
+          resolvedBills[resolved.id] = resolved;
+          _acknowledgedVersions[resolved.id] = resolved.updatedAt;
+        } else {
+          _acknowledgedVersions[localBill.id] = cloudRecord!.updatedAt;
+        }
+      } else {
+        final resolved = await _cloudRepository.saveBill(uid, localBill);
+        resolvedBills[resolved.id] = resolved;
+        _acknowledgedVersions[resolved.id] = resolved.updatedAt;
       }
     }
 
-    _history = {...cloudById, ...localById}.values.toList()
+    for (final record in cloudRecords) {
+      if (record.isDeleted) {
+        continue;
+      }
+      if (!localById.containsKey(record.id)) {
+        resolvedBills[record.id] = record.bill!;
+        _acknowledgedVersions[record.id] = record.updatedAt;
+      }
+    }
+
+    _history = resolvedBills.values.toList()
       ..sort((a, b) => b.date.compareTo(a.date));
     await _saveHistory();
+    await _saveAcknowledgedVersions();
     notifyListeners();
   }
 
@@ -248,7 +328,27 @@ class BillProvider extends ChangeNotifier {
     await _saveHistory();
     final user = FirebaseAuthService().currentUser;
     if (user != null) {
-      await _cloudRepository.deleteBill(user.uid, id);
+      final deletedAt = DateTime.now();
+      final deleted =
+          await _cloudRepository.deleteBill(user.uid, id, deletedAt);
+      if (deleted) {
+        _acknowledgedVersions.remove(id);
+      } else {
+        CloudBillRecord? cloudRecord;
+        for (final record in await _cloudRepository.fetchBills(user.uid)) {
+          if (record.id == id && !record.isDeleted) {
+            cloudRecord = record;
+            break;
+          }
+        }
+        if (cloudRecord?.bill != null) {
+          _history.add(cloudRecord!.bill!);
+          _acknowledgedVersions[id] = cloudRecord.updatedAt;
+        }
+      }
+      _history.sort((a, b) => b.date.compareTo(a.date));
+      await _saveHistory();
+      await _saveAcknowledgedVersions();
     }
     notifyListeners();
   }

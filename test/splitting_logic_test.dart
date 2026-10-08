@@ -112,5 +112,27 @@ void main() {
       expect(provider.getPersonSubtotal(aliceId), 40.0);
       expect(provider.getPersonSubtotal(bobId), 60.0);
     });
+
+    test('Saved bills preserve modification timestamps and read legacy data',
+        () {
+      final date = DateTime.utc(2026, 1, 1);
+      final updatedAt = DateTime.utc(2026, 1, 2);
+      final bill = SavedBill(
+        id: 'bill-1',
+        date: date,
+        updatedAt: updatedAt,
+        people: const [],
+        items: const [],
+        tax: 0,
+        discount: 0,
+        total: 0,
+      );
+      final restored = SavedBill.fromJson(bill.toJson());
+      final legacyJson = bill.toJson()..remove('updatedAt');
+      final legacy = SavedBill.fromJson(legacyJson);
+
+      expect(restored.updatedAt, updatedAt);
+      expect(legacy.updatedAt, date);
+    });
   });
 }

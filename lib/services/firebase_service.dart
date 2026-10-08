@@ -50,30 +50,94 @@ class BillCloudRepository {
         .collection('bills');
   }
 
-  Future<List<SavedBill>> fetchBills(String uid) async {
+  Future<List<CloudBillRecord>> fetchBills(String uid) async {
     if (!isAvailable) {
       return const [];
     }
 
     final snapshot = await _bills(uid).orderBy('date', descending: true).get();
     return snapshot.docs
-        .map((document) => SavedBill.fromJson(document.data()))
+        .map((document) => CloudBillRecord.fromJson(document.data()))
         .toList();
   }
 
-  Future<void> saveBill(String uid, SavedBill bill) async {
+  Future<SavedBill> saveBill(String uid, SavedBill bill) async {
     if (!isAvailable) {
-      return;
+      return bill;
     }
 
-    await _bills(uid).doc(bill.id).set(bill.toJson());
+    final reference = _bills(uid).doc(bill.id);
+    return FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(reference);
+      final cloudData = snapshot.data();
+      if (cloudData != null) {
+        final cloudRecord = CloudBillRecord.fromJson(cloudData);
+        if (cloudRecord.updatedAt.isAfter(bill.updatedAt)) {
+          return cloudRecord.bill ?? bill;
+        }
+      }
+
+      transaction.set(reference, bill.toJson());
+      return bill;
+    });
   }
 
-  Future<void> deleteBill(String uid, String billId) async {
+  Future<bool> deleteBill(
+    String uid,
+    String billId,
+    DateTime deletedAt,
+  ) async {
     if (!isAvailable) {
-      return;
+      return true;
     }
 
-    await _bills(uid).doc(billId).delete();
+    final reference = _bills(uid).doc(billId);
+    return FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(reference);
+      final cloudData = snapshot.data();
+      if (cloudData != null) {
+        final cloudRecord = CloudBillRecord.fromJson(cloudData);
+        if (cloudRecord.updatedAt.isAfter(deletedAt)) {
+          return false;
+        }
+      }
+
+      transaction.set(reference, {
+        'id': billId,
+        'deleted': true,
+        'updatedAt': deletedAt.toIso8601String(),
+        'date': deletedAt.toIso8601String(),
+      });
+      return true;
+    });
+  }
+}
+
+class CloudBillRecord {
+  final String id;
+  final DateTime updatedAt;
+  final SavedBill? bill;
+  final bool isDeleted;
+
+  const CloudBillRecord({
+    required this.id,
+    required this.updatedAt,
+    required this.bill,
+    required this.isDeleted,
+  });
+
+  factory CloudBillRecord.fromJson(Map<String, dynamic> json) {
+    final updatedAt = DateTime.tryParse(
+          json['updatedAt']?.toString() ?? '',
+        ) ??
+        DateTime.parse(json['date'].toString());
+    final isDeleted = json['deleted'] == true;
+
+    return CloudBillRecord(
+      id: json['id'].toString(),
+      updatedAt: updatedAt,
+      bill: isDeleted ? null : SavedBill.fromJson(json),
+      isDeleted: isDeleted,
+    );
   }
 }
